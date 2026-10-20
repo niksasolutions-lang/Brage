@@ -1,0 +1,181 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Global default-deny catch-all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    // 1. User Profile Validation
+    function isValidUserProfile(data) {
+      return data.userId is string && data.userId.size() <= 128 &&
+             data.displayName is string && data.displayName.size() > 0 && data.displayName.size() <= 100 &&
+             data.email is string && data.email.size() > 0 && data.email.size() <= 150 &&
+             (!('photoUrl' in data) || data.photoUrl == null || (data.photoUrl is string && data.photoUrl.size() <= 500)) &&
+             (!('phone' in data) || data.phone == null || (data.phone is string && data.phone.size() <= 30));
+    }
+
+    // 2. Booking Validation
+    function isValidBooking(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.userId is string && data.userId.size() <= 128 &&
+             data.serviceId is string && data.serviceId.size() <= 100 &&
+             data.serviceTitle is string && data.serviceTitle.size() <= 150 &&
+             data.categoryTitle is string && data.categoryTitle.size() <= 100 &&
+             data.providerName is string && data.providerName.size() <= 100 &&
+             data.providerInitials is string && data.providerInitials.size() <= 10 &&
+             data.status in ['CONFIRMED', 'EN_ROUTE', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'] &&
+             data.scheduledDate is string && data.scheduledDate.size() <= 50 &&
+             data.scheduledTimeSlot is string && data.scheduledTimeSlot.size() <= 50 &&
+             data.address is string && data.address.size() > 0 && data.address.size() <= 300 &&
+             data.contactPhone is string && data.contactPhone.size() <= 50 &&
+             data.basePrice is number && data.basePrice >= 0 &&
+             data.addOnsDescription is string && data.addOnsDescription.size() <= 300 &&
+             data.addOnsCost is number && data.addOnsCost >= 0 &&
+             data.isExpress is bool &&
+             data.expressFee is number && data.expressFee >= 0 &&
+             data.totalPrice is number && data.totalPrice >= 0 &&
+             data.specialInstructions is string && data.specialInstructions.size() <= 1000 &&
+             data.userRating is int && data.userRating >= 0 && data.userRating <= 5 &&
+             data.userReview is string && data.userReview.size() <= 2000;
+    }
+
+    // 3. Favorite Validation
+    function isValidFavorite(data) {
+      return data.serviceId is string && data.serviceId.size() > 0 && data.serviceId.size() <= 100;
+    }
+
+    // 4. Saved Address Validation
+    function isValidSavedAddress(data) {
+      return data.id is string && data.id.size() <= 128 &&
+             data.label is string && data.label.size() > 0 && data.label.size() <= 50 &&
+             data.street is string && data.street.size() > 0 && data.street.size() <= 200 &&
+             data.cityStateZip is string && data.cityStateZip.size() > 0 && data.cityStateZip.size() <= 100 &&
+             data.isDefault is bool;
+    }
+
+    // --- Users Collection & Subcollections ---
+    match /users/{userId} {
+      allow get: if isOwner(userId) && isValidId(userId);
+
+      allow create: if isOwner(userId) && isValidId(userId) &&
+                       incoming().userId == userId &&
+                       incoming().keys().hasAll(['userId', 'displayName', 'email', 'createdAt']) &&
+                       incoming().keys().hasOnly(['userId', 'displayName', 'email', 'photoUrl', 'phone', 'createdAt', 'updatedAt']) &&
+                       incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                       (!('updatedAt' in incoming()) || (incoming().updatedAt is timestamp && incoming().updatedAt <= request.time)) &&
+                       isValidUserProfile(incoming());
+
+      allow update: if isOwner(userId) && isValidId(userId) &&
+                       incoming().userId == existing().userId &&
+                       incoming().createdAt == existing().createdAt &&
+                       (!('updatedAt' in incoming()) || (incoming().updatedAt is timestamp && incoming().updatedAt <= request.time)) &&
+                       isValidUserProfile(incoming()) &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoUrl', 'phone', 'updatedAt']);
+
+      allow delete: if isOwner(userId) && isValidId(userId);
+
+      // --- Bookings Subcollection ---
+      match /bookings/{bookingId} {
+        allow get, list: if isOwner(userId);
+
+        allow create: if isOwner(userId) && isValidId(bookingId) &&
+                         incoming().userId == userId &&
+                         incoming().id == bookingId &&
+                         incoming().keys().hasAll([
+                           'id', 'userId', 'serviceId', 'serviceTitle', 'categoryTitle',
+                           'providerName', 'providerInitials', 'status', 'scheduledDate',
+                           'scheduledTimeSlot', 'address', 'contactPhone', 'basePrice',
+                           'addOnsDescription', 'addOnsCost', 'isExpress', 'expressFee',
+                           'totalPrice', 'specialInstructions', 'userRating', 'userReview',
+                           'createdAt'
+                         ]) &&
+                         incoming().keys().hasOnly([
+                           'id', 'userId', 'serviceId', 'serviceTitle', 'categoryTitle',
+                           'providerName', 'providerInitials', 'status', 'scheduledDate',
+                           'scheduledTimeSlot', 'address', 'contactPhone', 'basePrice',
+                           'addOnsDescription', 'addOnsCost', 'isExpress', 'expressFee',
+                           'totalPrice', 'specialInstructions', 'userRating', 'userReview',
+                           'createdAt', 'updatedAt'
+                         ]) &&
+                         incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                         (!('updatedAt' in incoming()) || (incoming().updatedAt is timestamp && incoming().updatedAt <= request.time)) &&
+                         isValidBooking(incoming());
+
+        allow update: if isOwner(userId) && isValidId(bookingId) &&
+                         incoming().userId == existing().userId &&
+                         incoming().id == existing().id &&
+                         incoming().createdAt == existing().createdAt &&
+                         (!('updatedAt' in incoming()) || (incoming().updatedAt is timestamp && incoming().updatedAt <= request.time)) &&
+                         isValidBooking(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'status', 'scheduledDate', 'scheduledTimeSlot', 'specialInstructions',
+                           'userRating', 'userReview', 'updatedAt'
+                         ]);
+
+        allow delete: if isOwner(userId) && isValidId(bookingId);
+      }
+
+      // --- Favorites Subcollection ---
+      match /favorites/{serviceId} {
+        allow get, list: if isOwner(userId);
+
+        allow create: if isOwner(userId) && isValidId(serviceId) &&
+                         incoming().serviceId == serviceId &&
+                         incoming().keys().hasAll(['serviceId', 'createdAt']) &&
+                         incoming().keys().hasOnly(['serviceId', 'createdAt']) &&
+                         incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                         isValidFavorite(incoming());
+
+        allow delete: if isOwner(userId) && isValidId(serviceId);
+      }
+
+      // --- Saved Addresses Subcollection ---
+      match /addresses/{addressId} {
+        allow get, list: if isOwner(userId);
+
+        allow create: if isOwner(userId) && isValidId(addressId) &&
+                         incoming().id == addressId &&
+                         incoming().keys().hasAll(['id', 'label', 'street', 'cityStateZip', 'isDefault', 'createdAt']) &&
+                         incoming().keys().hasOnly(['id', 'label', 'street', 'cityStateZip', 'isDefault', 'createdAt', 'updatedAt']) &&
+                         incoming().createdAt is timestamp && incoming().createdAt <= request.time &&
+                         (!('updatedAt' in incoming()) || (incoming().updatedAt is timestamp && incoming().updatedAt <= request.time)) &&
+                         isValidSavedAddress(incoming());
+
+        allow update: if isOwner(userId) && isValidId(addressId) &&
+                         incoming().id == existing().id &&
+                         incoming().createdAt == existing().createdAt &&
+                         (!('updatedAt' in incoming()) || (incoming().updatedAt is timestamp && incoming().updatedAt <= request.time)) &&
+                         isValidSavedAddress(incoming()) &&
+                         incoming().diff(existing()).affectedKeys().hasOnly([
+                           'label', 'street', 'cityStateZip', 'isDefault', 'updatedAt'
+                         ]);
+
+        allow delete: if isOwner(userId) && isValidId(addressId);
+      }
+    }
+  }
+}

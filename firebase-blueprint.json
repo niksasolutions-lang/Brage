@@ -1,0 +1,95 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "phone": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "displayName", "email", "createdAt"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "On-demand service booking",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "serviceId": { "type": "string" },
+        "serviceTitle": { "type": "string" },
+        "categoryTitle": { "type": "string" },
+        "providerName": { "type": "string" },
+        "providerInitials": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["CONFIRMED", "EN_ROUTE", "IN_PROGRESS", "COMPLETED", "CANCELLED"]
+        },
+        "scheduledDate": { "type": "string" },
+        "scheduledTimeSlot": { "type": "string" },
+        "address": { "type": "string" },
+        "contactPhone": { "type": "string" },
+        "basePrice": { "type": "number" },
+        "addOnsDescription": { "type": "string" },
+        "addOnsCost": { "type": "number" },
+        "isExpress": { "type": "boolean" },
+        "expressFee": { "type": "number" },
+        "totalPrice": { "type": "number" },
+        "specialInstructions": { "type": "string" },
+        "userRating": { "type": "integer" },
+        "userReview": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "serviceId", "serviceTitle", "providerName", "status", "scheduledDate", "address", "totalPrice", "createdAt"]
+    },
+    "Favorite": {
+      "title": "Favorite",
+      "description": "Bookmarked favorite service",
+      "type": "object",
+      "properties": {
+        "serviceId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["serviceId", "createdAt"]
+    },
+    "SavedAddress": {
+      "title": "SavedAddress",
+      "description": "User saved address for bookings",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "label": { "type": "string" },
+        "street": { "type": "string" },
+        "cityStateZip": { "type": "string" },
+        "isDefault": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "label", "street", "cityStateZip", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User profile collection"
+    },
+    "/users/{userId}/bookings/{bookingId}": {
+      "schema": { "$ref": "#/entities/Booking" },
+      "description": "User service bookings subcollection"
+    },
+    "/users/{userId}/favorites/{serviceId}": {
+      "schema": { "$ref": "#/entities/Favorite" },
+      "description": "User favorited services subcollection"
+    },
+    "/users/{userId}/addresses/{addressId}": {
+      "schema": { "$ref": "#/entities/SavedAddress" },
+      "description": "User saved service addresses subcollection"
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "BRAGE SERVICE",
+  "description": "On-demand local services platform for booking verified pros across home cleaning, repairs, wellness, tech, auto, and lifestyle categories.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
